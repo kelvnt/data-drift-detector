@@ -63,25 +63,52 @@ class DataDriftDetector:
                  df_post,
                  categorical_columns=None,
                  numeric_columns=None):
+        assert isinstance(df_prior, pd.DataFrame),\
+            "df_prior should be a pandas dataframe"
+        assert isinstance(df_post, pd.DataFrame),\
+            "df_prior should be a pandas dataframe"
+        assert df_prior.columns == df_post.columns,\
+            "df_prior and df_post should have the same column names"
+        assert df_prior.dtypes == df_post.dtypes,\
+            "df_prior and df_post should have the same column types"
+        assert isinstance(categorical_columns, (list, type(None))),\
+            "categorical_columns should be of type list"
+        assert isinstance(numerical_columns, (list, type(None))),\
+            "numerical_columns should be of type list"
+        assert (all(c in df_post.columns for c in categorical_columns) |
+                categorical_columns is None),\
+            "Some or all categorical_columns were not found in the dataframe"
+        assert (all(c in df_post.columns for c in numeric_columns) |
+                numeric_columns is None),\
+            "Some or all numeric_columns were not found in the dataframe"
 
         df_prior_ = copy.deepcopy(df_prior)
         df_post_ = copy.deepcopy(df_post)
 
         if categorical_columns is None:
-            categorical_columns = [i for i in df_prior_.columns if
-                                df_prior_.dtypes[i]=='object']
+            categorical_columns = (
+                [c for c in df_prior_.columns if
+                df_prior_.dtypes[c] == 'object']
+            )
+            logger.info(
+                "Identified categorical column(s): ",
+                categorical_columns
+            )
 
-        logger.info("Categorical column(s): ", categorical_columns)
-
-        df_prior_[categorical_columns] = df_prior_[categorical_columns].astype(str)
-        df_post_[categorical_columns] = df_post_[categorical_columns].astype(str)
+        df_prior_[categorical_columns] = (
+            df_prior_[categorical_columns].astype(str)
+        )
+        df_post_[categorical_columns] = (
+            df_post_[categorical_columns].astype(str)
+        )
 
         if numeric_columns is None:
-            numeric_columns = [i for i in df_prior_.columns if
-                            df_prior_.dtypes[i] in ['float64','float32',
-                                                    'int32','int64','uint8']]
-
-        logger.info("\nNumerical column(s): ", numeric_columns)
+            num_types = ['float64','float32','int32','int64','uint8']
+            numeric_columns = (
+                [c for c in df_prior_.columns if
+                 df_prior_.dtypes[c] in num_types]
+            )
+            logger.info("Identified numerical column(s): ", numeric_columns)
 
         df_prior_[numeric_columns] = df_prior_[numeric_columns].astype(float)
         df_post_[numeric_columns] = df_post_[numeric_columns].astype(float)
@@ -105,7 +132,7 @@ class DataDriftDetector:
 
         Returns
         ----
-        Sorted list of tuples containing the column name followed by the 
+        Sorted list of tuples containing the column name followed by the
         computed jensen shannon distance
         """
         res = {}
@@ -119,7 +146,7 @@ class DataDriftDetector:
             col_post['source'] = 'post'
 
             col_ = pd.concat([col_prior, col_post], ignore_index=True)
-            
+
             # aggregate and convert to probability array
             arr = (col_.groupby(['CHAS', 'source'])
                        .size()
@@ -129,7 +156,7 @@ class DataDriftDetector:
                        .droplevel(0, axis=1)
                   )
             arr_ = arr.div(arr.sum(axis=0),axis=1)
-            
+
             # calculate distance
             d = jensenshannon(arr_['prior'].to_numpy(),
                               arr_['post'].to_numpy())
@@ -146,12 +173,12 @@ class DataDriftDetector:
             # get range of values
             min_ = min(col_prior.min(), col_post.min())
             max_ = max(col_prior.max(), col_post.max())
-            range = np.linspace(start=min_, stop=max_, num=STEPS)
+            range_ = np.linspace(start=min_, stop=max_, num=STEPS)
 
             # sample range from KDE
-            arr_prior_ = kde_prior(range)
-            arr_post_ = kde_post(range)
-            
+            arr_prior_ = kde_prior(range_)
+            arr_post_ = kde_post(range_)
+
             arr_prior = arr_prior_ / np.sum(arr_prior_)
             arr_post = arr_post_ / np.sum(arr_post_)
 
@@ -195,6 +222,15 @@ class DataDriftDetector:
         -------
         Resulting plot
         """
+        assert (all(c in self.categorical_columns for
+                    c in plot_categorical_columns) |
+                plot_categorical_columns is None),\
+            "Some or all plot_categorical_columns were not found in the dataframe"
+        assert (all(c in self.numeric_columns for c in plot_numeric_columns) |
+                plot_numeric_columns is None),\
+            "Some or all plot_numeric_columns were not found in the dataframe"
+        assert isinstance(categorical_on_y_axis, bool),\
+            "categorical_on_y_axis should be a boolean value"
 
         df_prior = self.df_prior.copy()
         df_post = self.df_post.copy()
@@ -215,12 +251,12 @@ class DataDriftDetector:
         plot_df = pd.concat([df_prior, df_post])
 
         logger.info(
-            "Plotting the following categorical column(s):\n",
+            "Plotting the following categorical column(s):",
             plot_categorical_columns,
-            "\nAgainst the following numerical column(s):\n",
+            "Against the following numerical column(s):",
              plot_numeric_columns,
-             "\nCategorical columns with high cardinality (>20 unique values)",
-             "are not plotted.\n"
+             "Categorical columns with high cardinality (>20 unique values)",
+             "are not plotted."
         )
 
         # violinplot does not treat numeric string cols as string - error
@@ -255,7 +291,7 @@ class DataDriftDetector:
 
     def plot_numeric_to_numeric(self,
                                 plot_numeric_columns=None,
-                                alpha=1):
+                                alpha=1.0):
         """Plots charts to compare numerical columns pairwise.
 
         Plots a pairplot (from seaborn) of numeric columns, with a distribution
@@ -273,6 +309,9 @@ class DataDriftDetector:
         -------
         Resulting plot
         """
+        assert (all(c in self.numeric_columns for c in plot_numeric_columns) |
+                plot_numeric_columns is None),\
+            "Some or all plot_numeric_columns were not found in the dataframe"
 
         if plot_numeric_columns is None:
             plot_numeric_columns = self.numeric_columns
@@ -285,8 +324,9 @@ class DataDriftDetector:
 
         plot_df = pd.concat([df_prior, df_post])
 
-        logger.info("Plotting the following numeric column(s):\n",
-              plot_numeric_columns, "\n")
+        logger.info(
+            "Plotting the following numeric column(s):", plot_numeric_columns
+        )
 
         g = sns.pairplot(data=plot_df,
                          hue='source',
@@ -319,7 +359,7 @@ class DataDriftDetector:
                                         'max_depth': [3, 4, 5]}):
         """Compares the ML efficacy of the prior data to the post data
 
-        For a given `target_column`, this builds a ML model separately with 
+        For a given `target_column`, this builds a ML model separately with
         `df_prior` and `df_post`, and compares the performance
         between the 2 models on a test dataset. Test data will be drawn
         from `df_post` if it is not provided.
@@ -360,9 +400,20 @@ class DataDriftDetector:
 
         Returns
         ----
-        Returns a report of ML metrics between the real model and the
-        synthetic model
+        Returns a report of ML metrics between the prior model and the
+        post model
         """
+        assert isinstance(target_column, str),\
+            "target_column should be of type string"
+        assert target_column in self.df_prior.columns,\
+            "target_column does not exist in df_prior"
+        assert isinstance(test_data, (pandas.DataFrame, type(None))),\
+            "test_data should be a pandas dataframe"
+        assert isinstance(OHE_columns, (list, type(None))),\
+            "OHE_columns should be of type list"
+        assert isinstance(high_cardinality_columns, (list, type(None))),\
+            "high_cardinality_columns should be of type list"
+
 
         # TODO: - Allow choice of model?
         #       - Allow choice of encoding for high cardinality cols?
@@ -425,14 +476,13 @@ class DataDriftDetector:
         train_prior = copy.deepcopy(self.df_prior)
 
         # create test data if not provided
-        if self.test_data is None:
+        if self.test_data is None:=
 
-            msg = "No test data was provided. Test data will be created with "
-            msg += "a {}-{} ".format(self.train_size*100,
-                                     (1-self.train_size)*100)
-            msg += "shuffle split from the post data set."
-
-            logger.info(msg)
+            logger.info(
+                "No test data was provided. Test data will be created with",
+                "a {}-{} ".format(self.train_size*100, (1-self.train_size)*100),
+                "shuffle split from the post data set."
+            )
 
             df_post = shuffle(df_post)
             n_split = int(len(df_post)*self.train_size)
@@ -453,7 +503,7 @@ class DataDriftDetector:
         if len(OHE_columns) > 0:
             logger.info("One hot encoded columns: ", OHE_columns)
         if len(high_cardinality_columns) > 0:
-            logger.info("\nCat boost encoded columns: ", high_cardinality_columns)
+            logger.info("Cat boost encoded columns: ", high_cardinality_columns)
 
         # concat and then OHE to ensure columns match
         train_prior['source'] = "Train Prior"
@@ -493,7 +543,6 @@ class DataDriftDetector:
                               test_post[self.target_column])
         )
 
-        
         X_train_prior = train_prior.drop(self.target_column, axis=1).astype(float)
         y_train_prior = train_prior[self.target_column].astype(float)
         X_test_prior = test_prior.drop(self.target_column, axis=1).astype(float)
@@ -536,9 +585,9 @@ class DataDriftDetector:
 
         logger.info(
             "A RandomForestRegressor with a RandomizedSearchCV was trained.",
-            "\nThe final model (trained with real data) parameters are:\n",
+            "The final model (trained with prior data) parameters are:",
             model_prior.best_estimator_,
-            "\nThe final model (trained with synthetic data) parameters are:\n",
+            "The final model (trained with post data) parameters are:",
             model_post.best_estimator_
         )
 
@@ -570,9 +619,9 @@ class DataDriftDetector:
 
         logger.info(
             "A RandomForestClassifier with a RandomizedSearchCV was trained.",
-            "\nThe final model (trained with real data) parameters are:\n",
+            "The final model (trained with prior data) parameters are:",
             model_prior.best_estimator_,
-            "\nThe final model (trained with synthetic data) parameters are:\n",
+            "The final model (trained with post data) parameters are:",
             model_post.best_estimator_
         )
 
@@ -582,7 +631,7 @@ class DataDriftDetector:
 
     def _eval_regressor(self):
         """
-        Calculates the RMSE, MAE & R2 score of the real and synthetic model.
+        Calculates the RMSE, MAE & R2 score of the prior and post model.
 
         Returns a pandas dataframe of the results.
         """
@@ -598,10 +647,13 @@ class DataDriftDetector:
         mae_post = mean_absolute_error(self.y_test, y_pred_post)
         r2_post = r2_score(self.y_test, y_pred_post)
 
-        res = pd.DataFrame({'RMSE': [rmse_prior, rmse_post],
-                            'MAE': [mae_prior, mae_post],
-                            'R2': [r2_prior, r2_post]},
-                            index=['Prior', 'Post'])
+        res = pd.DataFrame({
+            'RMSE': [rmse_prior, rmse_post],
+            'MAE': [mae_prior, mae_post],
+            'R2': [r2_prior, r2_post]
+            },
+            index=['Prior', 'Post']
+        )
 
         self.ml_report = res
 
@@ -609,7 +661,7 @@ class DataDriftDetector:
     def _eval_classifier(self):
         """
         Calculates the accuracy, precision, recall, F1 score & AUC of the
-        real and synthetic model.
+        prior and post model.
 
         Returns a pandas dataframe of the result.
         """
@@ -648,31 +700,21 @@ class DataDriftDetector:
 
         for i in iters:
 
-            precision_prior = precision_score(y_test[:,i],
-                                             y_pred_prior[:,i])
-            recall_prior = recall_score(y_test[:,i],
-                                       y_pred_prior[:,i])
-            acc_prior = accuracy_score(y_test[:,i],
-                                      y_pred_prior[:,i])
-            f1_prior = f1_score(y_test[:,i],
-                               y_pred_prior[:,i])
+            precision_prior = precision_score(y_test[:,i], y_pred_prior[:,i])
+            recall_prior = recall_score(y_test[:,i], y_pred_prior[:,i])
+            acc_prior = accuracy_score(y_test[:,i], y_pred_prior[:,i])
+            f1_prior = f1_score(y_test[:,i], y_pred_prior[:,i])
             try:
-                auc_prior = roc_auc_score(y_test[:,i],
-                                         y_pred_prior[:,i])
+                auc_prior = roc_auc_score(y_test[:,i], y_pred_prior[:,i])
             except ValueError:
                 auc_prior = "NA"
 
-            precision_post = precision_score(y_test[:,i],
-                                              y_pred_post[:,i])
-            recall_post = recall_score(y_test[:,i],
-                                        y_pred_post[:,i])
-            acc_post = accuracy_score(y_test[:,i],
-                                       y_pred_post[:,i])
-            f1_post = f1_score(y_test[:,i],
-                                y_pred_post[:,i])
+            precision_post = precision_score(y_test[:,i], y_pred_post[:,i])
+            recall_post = recall_score(y_test[:,i], y_pred_post[:,i])
+            acc_post = accuracy_score(y_test[:,i], y_pred_post[:,i])
+            f1_post = f1_score(y_test[:,i], y_pred_post[:,i])
             try:
-                auc_post = roc_auc_score(y_test[:,i],
-                                          y_pred_post[:,i])
+                auc_post = roc_auc_score(y_test[:,i], y_pred_post[:,i])
             except ValueError:
                 auc_post = "NA"
 
@@ -682,17 +724,15 @@ class DataDriftDetector:
             index = pd.MultiIndex.from_tuples(multiindex,
                                               names=['Class', 'Data Type'])
 
-            score = pd.DataFrame({'Accuracy': [acc_prior,
-                                               acc_post],
-                                  'Precision': [precision_prior,
-                                                precision_post],
-                                  'Recall': [recall_prior,
-                                             recall_post],
-                                  'F1': [f1_prior,
-                                         f1_post],
-                                  'AUC': [auc_prior,
-                                          auc_post]},
-                                  index=index)
+            score = pd.DataFrame({
+                'Accuracy': [acc_prior, acc_post],
+                'Precision': [precision_prior, precision_post],
+                'Recall': [recall_prior, recall_post],
+                'F1': [f1_prior, f1_post],
+                'AUC': [auc_prior, auc_post]
+                },
+                index=index
+            )
 
             res = pd.concat([res, score])
 
