@@ -54,7 +54,7 @@ class DataDriftDetector:
         column types if not provided
 
     numeric_columns: <list of str>
-        A list of numerical columns in the dataset, will be determined by
+        A list of numeric columns in the dataset, will be determined by
         column types if not provided
 
     """
@@ -67,20 +67,14 @@ class DataDriftDetector:
             "df_prior should be a pandas dataframe"
         assert isinstance(df_post, pd.DataFrame),\
             "df_prior should be a pandas dataframe"
-        assert df_prior.columns == df_post.columns,\
+        assert all(df_prior.columns == df_post.columns),\
             "df_prior and df_post should have the same column names"
-        assert df_prior.dtypes == df_post.dtypes,\
+        assert all(df_prior.dtypes == df_post.dtypes),\
             "df_prior and df_post should have the same column types"
         assert isinstance(categorical_columns, (list, type(None))),\
             "categorical_columns should be of type list"
-        assert isinstance(numerical_columns, (list, type(None))),\
-            "numerical_columns should be of type list"
-        assert (all(c in df_post.columns for c in categorical_columns) |
-                categorical_columns is None),\
-            "Some or all categorical_columns were not found in the dataframe"
-        assert (all(c in df_post.columns for c in numeric_columns) |
-                numeric_columns is None),\
-            "Some or all numeric_columns were not found in the dataframe"
+        assert isinstance(numeric_columns, (list, type(None))),\
+            "numeric_columns should be of type list"
 
         df_prior_ = copy.deepcopy(df_prior)
         df_post_ = copy.deepcopy(df_post)
@@ -108,7 +102,7 @@ class DataDriftDetector:
                 [c for c in df_prior_.columns if
                  df_prior_.dtypes[c] in num_types]
             )
-            logger.info("Identified numerical column(s): ", numeric_columns)
+            logger.info("Identified numeric column(s): ", numeric_columns)
 
         df_prior_[numeric_columns] = df_prior_[numeric_columns].astype(float)
         df_post_[numeric_columns] = df_post_[numeric_columns].astype(float)
@@ -126,7 +120,7 @@ class DataDriftDetector:
         For categorical columns, the probability of each category will be
         computed separately for `df_prior` and `df_post`, and the jensen
         shannon distance between the 2 probability arrays will be computed. For
-        numerical columns, the values will first be fitted into a gaussian KDE
+        numeric columns, the values will first be fitted into a gaussian KDE
         separately for `df_prior` and `df_post`, and a probability array
         will be sampled from them and compared with the jensen shannon distance
 
@@ -196,9 +190,9 @@ class DataDriftDetector:
                                     categorical_on_y_axis=True,
                                     height=4,
                                     aspect=1.0):
-        """Plots charts to compare categorical to numerical columns pairwise.
+        """Plots charts to compare categorical to numeric columns pairwise.
 
-        Plots a pairgrid violin plot of categorical columns to numerical
+        Plots a pairgrid violin plot of categorical columns to numeric
         columns, split and colored by the source of datasets
 
         Args
@@ -207,7 +201,7 @@ class DataDriftDetector:
             List of categorical columns to plot, uses all if no specified
 
         plot_numeric_columns: <list of str>
-            List of numerical columns to plot, uses all if not specified
+            List of numeric columns to plot, uses all if not specified
 
         categorical_on_y_axis: <boolean>
             Determines layout of resulting image - if True, categorical
@@ -222,13 +216,10 @@ class DataDriftDetector:
         -------
         Resulting plot
         """
-        assert (all(c in self.categorical_columns for
-                    c in plot_categorical_columns) |
-                plot_categorical_columns is None),\
-            "Some or all plot_categorical_columns were not found in the dataframe"
-        assert (all(c in self.numeric_columns for c in plot_numeric_columns) |
-                plot_numeric_columns is None),\
-            "Some or all plot_numeric_columns were not found in the dataframe"
+        assert isinstance(plot_categorical_columns, (list, type(None))),\
+            "plot_categorical_columns should be of type list"
+        assert isinstance(plot_numeric_columns, (list, type(None))),\
+            "plot_numeric_columns should be of type list"
         assert isinstance(categorical_on_y_axis, bool),\
             "categorical_on_y_axis should be a boolean value"
 
@@ -238,9 +229,10 @@ class DataDriftDetector:
         col_nunique = df_prior.nunique()
 
         if plot_categorical_columns is None:
-            plot_categorical_columns = [col for col in col_nunique.index if
-                            (col_nunique[col] <= 20) &
-                                     (col in self.categorical_columns)]
+            plot_categorical_columns = (
+                [col for col in col_nunique.index if
+                 (col_nunique[col] <= 20) & (col in self.categorical_columns)]
+            )
 
         if plot_numeric_columns is None:
             plot_numeric_columns = self.numeric_columns
@@ -253,7 +245,7 @@ class DataDriftDetector:
         logger.info(
             "Plotting the following categorical column(s):",
             plot_categorical_columns,
-            "Against the following numerical column(s):",
+            "Against the following numeric column(s):",
              plot_numeric_columns,
              "Categorical columns with high cardinality (>20 unique values)",
              "are not plotted."
@@ -292,7 +284,7 @@ class DataDriftDetector:
     def plot_numeric_to_numeric(self,
                                 plot_numeric_columns=None,
                                 alpha=1.0):
-        """Plots charts to compare numerical columns pairwise.
+        """Plots charts to compare numeric columns pairwise.
 
         Plots a pairplot (from seaborn) of numeric columns, with a distribution
         plot on the diagonal and a scatter plot for all other charts
@@ -300,7 +292,7 @@ class DataDriftDetector:
         Args
         ----
         plot_numeric_columns: <list of str>
-            List of numerical columns to plot, uses all if not specified
+            List of numeric columns to plot, uses all if not specified
 
         alpha: <float>
             Transparency of the scatter plot
@@ -309,9 +301,8 @@ class DataDriftDetector:
         -------
         Resulting plot
         """
-        assert (all(c in self.numeric_columns for c in plot_numeric_columns) |
-                plot_numeric_columns is None),\
-            "Some or all plot_numeric_columns were not found in the dataframe"
+        assert isinstance(plot_numeric_columns, (list, type(None))),\
+            "plot_numeric_columns should be of type list"
 
         if plot_numeric_columns is None:
             plot_numeric_columns = self.numeric_columns
@@ -407,7 +398,7 @@ class DataDriftDetector:
             "target_column should be of type string"
         assert target_column in self.df_prior.columns,\
             "target_column does not exist in df_prior"
-        assert isinstance(test_data, (pandas.DataFrame, type(None))),\
+        assert isinstance(test_data, (pd.DataFrame, type(None))),\
             "test_data should be a pandas dataframe"
         assert isinstance(OHE_columns, (list, type(None))),\
             "OHE_columns should be of type list"
@@ -476,7 +467,7 @@ class DataDriftDetector:
         train_prior = copy.deepcopy(self.df_prior)
 
         # create test data if not provided
-        if self.test_data is None:=
+        if self.test_data is None:
 
             logger.info(
                 "No test data was provided. Test data will be created with",
