@@ -17,7 +17,6 @@ from sklearn.utils import shuffle
 import logging
 logger = logging.getLogger(__name__)
 
-
 class DataDriftDetector:
     """Compare differences between 2 datasets
 
@@ -35,6 +34,10 @@ class DataDriftDetector:
 
     plot_categorical_to_numeric:
         Creates a pairgrid violin plot between the 2 datasets
+
+    plot_categorical:
+        Creates a proportion histogram between the 2 datasets for categorical
+        columns
 
     compare_ml_efficacy:
         Compares the ML efficacy of a model built between the 2 datasets
@@ -142,14 +145,15 @@ class DataDriftDetector:
             col_ = pd.concat([col_prior, col_post], ignore_index=True)
 
             # aggregate and convert to probability array
-            arr = (col_.groupby(['CHAS', 'source'])
+            arr = (col_.groupby([col, 'source'])
                        .size()
                        .to_frame()
                        .reset_index()
-                       .pivot(index='CHAS', columns='source')
+                       .pivot(index=col, columns='source')
                        .droplevel(0, axis=1)
                   )
             arr_ = arr.div(arr.sum(axis=0),axis=1)
+            arr_.fillna(0, inplace=True)
 
             # calculate distance
             d = jensenshannon(arr_['prior'].to_numpy(),
@@ -213,7 +217,7 @@ class DataDriftDetector:
         aspect: <float>
             Aspect * height gives the width (in inches) of each facet.
         Returns
-        -------
+        ----
         Resulting plot
         """
         assert isinstance(plot_categorical_columns, (list, type(None))),\
@@ -298,7 +302,7 @@ class DataDriftDetector:
             Transparency of the scatter plot
 
         Returns
-        -------
+        ----
         Resulting plot
         """
         assert isinstance(plot_numeric_columns, (list, type(None))),\
@@ -328,8 +332,66 @@ class DataDriftDetector:
         return g
 
 
-    # WIP
-    # def plot_categorical_to_categorical(self):
+    def plot_categorical(self, plot_categorical_columns=None):
+        """Plot histograms to compare categorical columns
+
+        Args
+        ----
+        plot_categorical_columns: <list of str>
+            List of categorical columns to plot, uses all if no specified
+
+        Returns
+        ----
+        Resulting plot
+
+        """
+        assert isinstance(plot_categorical_columns, (list, type(None))),\
+            "plot_categorical_columns should be of type list"
+
+        col_nunique = self.df_prior.nunique()
+        if plot_categorical_columns is None:
+            plot_categorical_columns = (
+                [col for col in col_nunique.index if
+                 (col_nunique[col] <= 20) & (col in self.categorical_columns)]
+            )
+
+        logger.info(
+            "Plotting the following categorical column(s):",
+            plot_categorical_columns
+        )
+
+        fig, ax = plt.subplots(len(plot_categorical_columns), 2, 
+                               figsize=(10, 5*len(plot_categorical_columns)))
+        
+        for i, col in enumerate(plot_categorical_columns):
+            
+            if len(plot_categorical_columns) == 1:
+                _ax0 = ax[0]
+                _ax1 = ax[1]
+            elif len(plot_categorical_columns) > 1:
+                _ax0 = ax[i, 0]
+                _ax1 = ax[i, 1]
+            
+            (self.df_prior[col].value_counts(normalize=True)
+                               .rename("Proportion")
+                               .sort_index()
+                               .reset_index()
+                               .pipe((sns.barplot, "data"),
+                                     x="index", y="Proportion", ax=_ax0))
+            _ax0.set_title(col + ", prior")
+            _ax0.set(xlabel=col)
+            (self.df_post[col].value_counts(normalize=True)
+                              .rename("Proportion")
+                              .sort_index()
+                              .reset_index()
+                              .pipe((sns.barplot, "data"),
+                                    x="index", y="Proportion", ax=_ax1))
+            _ax1.set(xlabel=col)
+            _ax1.set_title(col + ", post")
+
+        plt.close(fig)
+        
+        return fig
 
 
     def _rmse(self, targets, predictions):

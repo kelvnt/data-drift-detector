@@ -23,6 +23,7 @@ To compare 2 datasets:
     detector.calculate_drift()
     detector.plot_numeric_to_numeric()
     detector.plot_categorical_to_numeric()
+    detector.plot_categorical()
     detector.compare_ml_efficacy(target_column="some_target_column")
 
 You may also view an example notebook in the following directory `examples/example_usage.ipynb` to explore how it may be used.
