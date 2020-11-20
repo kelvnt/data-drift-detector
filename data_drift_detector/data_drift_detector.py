@@ -17,6 +17,7 @@ from sklearn.utils import shuffle
 import logging
 logger = logging.getLogger(__name__)
 
+
 class DataDriftDetector:
     """Compare differences between 2 datasets
 
@@ -360,18 +361,18 @@ class DataDriftDetector:
             plot_categorical_columns
         )
 
-        fig, ax = plt.subplots(len(plot_categorical_columns), 2, 
+        fig, ax = plt.subplots(len(plot_categorical_columns), 2,
                                figsize=(10, 5*len(plot_categorical_columns)))
-        
+
         for i, col in enumerate(plot_categorical_columns):
-            
+
             if len(plot_categorical_columns) == 1:
                 _ax0 = ax[0]
                 _ax1 = ax[1]
             elif len(plot_categorical_columns) > 1:
                 _ax0 = ax[i, 0]
                 _ax1 = ax[i, 1]
-            
+
             (self.df_prior[col].value_counts(normalize=True)
                                .rename("Proportion")
                                .sort_index()
@@ -390,7 +391,7 @@ class DataDriftDetector:
             _ax1.set_title(col + ", post")
 
         plt.close(fig)
-        
+
         return fig
 
 
