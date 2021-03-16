@@ -133,7 +133,8 @@ class DataDriftDetector:
         Sorted list of tuples containing the column name followed by the
         computed jensen shannon distance
         """
-        res = {}
+        cat_res = {}
+        num_res = {}
         STEPS = 100
 
         for col in self.categorical_columns:
@@ -160,7 +161,7 @@ class DataDriftDetector:
             d = jensenshannon(arr_['prior'].to_numpy(),
                               arr_['post'].to_numpy())
 
-            res.update({col: d})
+            cat_res.update({col: d})
 
         for col in self.numeric_columns:
             # fit gaussian_kde
@@ -184,9 +185,14 @@ class DataDriftDetector:
             # calculate js d
             d = jensenshannon(arr_prior, arr_post)
 
-            res.update({col: d})
+            num_res.update({col: d})
 
-        return sorted(res.items(), key=lambda x:x[1], reverse=True)
+        if len(num_res) > 0:
+            num_res = sorted(num_res.items(), key=lambda x:x[1], reverse=True)
+        if len(cat_res) > 0:
+            cat_res = sorted(num_res.items(), key=lambda x:x[1], reverse=True)
+
+        return {'categorical': cat_res, 'numerical': num_res}
 
 
     def plot_categorical_to_numeric(self,
@@ -404,6 +410,7 @@ class DataDriftDetector:
                             test_data=None,
                             OHE_columns=None,
                             high_cardinality_columns=None,
+                            OHE_columns_cutoff=5,
                             random_state=None,
                             train_size=0.7,
                             cv=3,
@@ -434,6 +441,10 @@ class DataDriftDetector:
         high_cardinality_columns: <list of str>
             List of columns to be cat boost encoded, will be
             determined if not provided
+
+        OHE_columns_cutoff: <int>
+            Number of unique labels in a column to determine OHE_columns &
+            high_cardinality_columns if not provided. 
 
         random_state: <int>
             Random state for the RandomizedSearchCV & the model fitting
@@ -483,12 +494,12 @@ class DataDriftDetector:
 
         if OHE_columns is None:
             OHE_columns = [col for col in col_nunique.index if
-                        (col_nunique[col] <= 20) &
+                        (col_nunique[col] <= OHE_columns_cutoff) &
                         (col in self.categorical_columns)]
 
         if high_cardinality_columns is None:
             high_cardinality_columns = [col for col in col_nunique.index if
-                                     (col_nunique[col] > 20) &
+                                     (col_nunique[col] > OHE_columns_cutoff) &
                                      (col in self.categorical_columns)]
 
         self.OHE_columns = OHE_columns
