@@ -141,17 +141,17 @@ class DataDriftDetector:
             # to ensure similar order, concat before computing probability
             col_prior = self.df_prior[col].to_frame()
             col_post = self.df_post[col].to_frame()
-            col_prior['source'] = 'prior'
-            col_post['source'] = 'post'
+            col_prior['_source'] = 'prior'
+            col_post['_source'] = 'post'
 
             col_ = pd.concat([col_prior, col_post], ignore_index=True)
 
             # aggregate and convert to probability array
-            arr = (col_.groupby([col, 'source'])
+            arr = (col_.groupby([col, '_source'])
                        .size()
                        .to_frame()
                        .reset_index()
-                       .pivot(index=col, columns='source')
+                       .pivot(index=col, columns='_source')
                        .droplevel(0, axis=1)
                   )
             arr_ = arr.div(arr.sum(axis=0),axis=1)
@@ -190,7 +190,7 @@ class DataDriftDetector:
         if len(num_res) > 0:
             num_res = sorted(num_res.items(), key=lambda x:x[1], reverse=True)
         if len(cat_res) > 0:
-            cat_res = sorted(num_res.items(), key=lambda x:x[1], reverse=True)
+            cat_res = sorted(cat_res.items(), key=lambda x:x[1], reverse=True)
 
         return {'categorical': cat_res, 'numerical': num_res}
 
@@ -248,8 +248,8 @@ class DataDriftDetector:
         if plot_numeric_columns is None:
             plot_numeric_columns = self.numeric_columns
 
-        df_prior["source"] = "Prior"
-        df_post["source"] = "Post"
+        df_prior["_source"] = "Prior"
+        df_post["_source"] = "Post"
 
         plot_df = pd.concat([df_prior, df_post])
 
@@ -278,11 +278,11 @@ class DataDriftDetector:
         g = sns.PairGrid(data=plot_df,
                          x_vars=x_cols,
                          y_vars=y_cols,
+                         hue='_source',
                          height=height,
                          aspect=aspect)
 
         g.map(sns.violinplot,
-              hue=plot_df["source"],
               split=True,
               palette="muted",
               bw=0.1)
@@ -321,8 +321,8 @@ class DataDriftDetector:
         df_prior = self.df_prior[plot_numeric_columns].copy()
         df_post = self.df_post[plot_numeric_columns].copy()
 
-        df_prior['source'] = "Prior"
-        df_post['source'] = "Post"
+        df_prior['_source'] = "Prior"
+        df_post['_source'] = "Post"
 
         plot_df = pd.concat([df_prior, df_post])
 
@@ -331,10 +331,10 @@ class DataDriftDetector:
         )
 
         g = sns.pairplot(data=plot_df,
-                         hue='source',
+                         hue='_source',
                          plot_kws={'alpha': alpha})
 
-        plt.legend()
+        #plt.legend()
 
         return g
 

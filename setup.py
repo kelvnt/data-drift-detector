@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="data-drift-detector",
-    version="0.0.2",
+    version="0.0.3",
     author="Kelvin Tay",
     author_email="btkelvin@gmail.com",
     description="Compare differences between 2 datasets to identify data drift",
@@ -21,7 +21,7 @@ setuptools.setup(
         "pandas==1.0.0",
         "scikit-learn>=0.23.0",
         "scipy>=1.5.2",
-        "seaborn>=0.11.0"
+        "seaborn>=0.11.1"
     ],
     python_requires=">=3.6.0"
 )
