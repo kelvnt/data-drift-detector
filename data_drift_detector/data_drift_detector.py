@@ -334,8 +334,6 @@ class DataDriftDetector:
                          hue='_source',
                          plot_kws={'alpha': alpha})
 
-        #plt.legend()
-
         return g
 
 
