@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import copy
-pd.options.mode.chained_assignment = None
 import matplotlib.pyplot as plt
 import seaborn as sns
 from category_encoders import CatBoostEncoder
@@ -15,52 +14,41 @@ from sklearn.metrics import (r2_score, mean_absolute_error, precision_score,
 from sklearn.utils import shuffle
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 class DataDriftDetector:
     """Compare differences between 2 datasets
-
     DataDriftDetector creates useful methods to compare 2 datasets,
     created to allow ease of measuring the fidelity between 2 datasets.
-
     Methods
     ----
     calculate_drift:
         Calculates the distribution distance for each column between the
         datasets with the jensen shannon metric
-
     plot_numeric_to_numeric:
         Creates a pairplot between the 2 datasets
-
     plot_categorical_to_numeric:
         Creates a pairgrid violin plot between the 2 datasets
-
     plot_categorical:
         Creates a proportion histogram between the 2 datasets for categorical
         columns
-
     compare_ml_efficacy:
         Compares the ML efficacy of a model built between the 2 datasets
-
     Args
     ----
     df_prior: <pandas.DataFrame>
         Pandas dataframe of the prior dataset. In practice, this would be the
         dataset used to train a live model
-
     df_post: <pandas.DataFrame>
         Pandas dataframe of the post dataset. In practice, this would be the
         current dataset that's flowing into a live model
-
     categorical_columns: <list of str>
         A list of categorical columns in the dataset, will be determined by
         column types if not provided
-
     numeric_columns: <list of str>
         A list of numeric columns in the dataset, will be determined by
         column types if not provided
-
     """
     def __init__(self,
                  df_prior,
@@ -120,14 +108,12 @@ class DataDriftDetector:
 
     def calculate_drift(self):
         """Calculates the jensen shannon distance between the 2 datasets
-
         For categorical columns, the probability of each category will be
         computed separately for `df_prior` and `df_post`, and the jensen
         shannon distance between the 2 probability arrays will be computed. For
         numeric columns, the values will first be fitted into a gaussian KDE
         separately for `df_prior` and `df_post`, and a probability array
         will be sampled from them and compared with the jensen shannon distance
-
         Returns
         ----
         Sorted list of tuples containing the column name followed by the
@@ -165,8 +151,8 @@ class DataDriftDetector:
 
         for col in self.numeric_columns:
             # fit gaussian_kde
-            col_prior = self.df_prior[col]
-            col_post = self.df_post[col]
+            col_prior = self.df_prior[col].dropna()
+            col_post = self.df_post[col].dropna()
             kde_prior = gaussian_kde(col_prior)
             kde_post = gaussian_kde(col_post)
 
@@ -192,35 +178,30 @@ class DataDriftDetector:
         if len(cat_res) > 0:
             cat_res = sorted(cat_res.items(), key=lambda x:x[1], reverse=True)
 
-        return {'categorical': cat_res, 'numerical': num_res}
+        return {'categorical': dict(cat_res),
+                'numerical': dict(num_res)}
 
 
     def plot_categorical_to_numeric(self,
                                     plot_categorical_columns=None,
                                     plot_numeric_columns=None,
                                     categorical_on_y_axis=True,
-                                    height=4,
-                                    aspect=1.0):
+                                    grid_kws={'height':5},
+                                    plot_kws={}):
         """Plots charts to compare categorical to numeric columns pairwise.
-
         Plots a pairgrid violin plot of categorical columns to numeric
         columns, split and colored by the source of datasets
-
         Args
         ----
         plot_categorical_columns: <list of str>
             List of categorical columns to plot, uses all if no specified
-
         plot_numeric_columns: <list of str>
             List of numeric columns to plot, uses all if not specified
-
         categorical_on_y_axis: <boolean>
             Determines layout of resulting image - if True, categorical
             columns will be on the y axis
-
         height: <int>
             Height (in inches) of each facet
-
         aspect: <float>
             Aspect * height gives the width (in inches) of each facet.
         Returns
@@ -263,9 +244,9 @@ class DataDriftDetector:
         )
 
         # violinplot does not treat numeric string cols as string - error
-        # sln: added a `_` to ensure it is read as a string
+        # sln: added a whitespace to ensure it is read as a string
         plot_df[plot_categorical_columns] = (
-            plot_df[plot_categorical_columns].astype(str) + "_"
+            plot_df[plot_categorical_columns].astype(str) + " "
         )
 
         if categorical_on_y_axis:
@@ -279,35 +260,36 @@ class DataDriftDetector:
                          x_vars=x_cols,
                          y_vars=y_cols,
                          hue='_source',
-                         height=height,
-                         aspect=aspect)
+                         hue_kws={'split':True},
+                         **grid_kws)
 
         g.map(sns.violinplot,
+              hue=plot_df['_source'],
               split=True,
-              palette="muted",
-              bw=0.1)
+              **plot_kws)
 
-        plt.legend()
+        g.add_legend()
 
         return g
 
 
     def plot_numeric_to_numeric(self,
+                                kind='scatter',
+                                diag_kind='kde',
+                                plot_kws=None,
+                                grid_kws=None,
+                                diag_kws={'common_norm':False},
                                 plot_numeric_columns=None,
-                                alpha=1.0):
+                                **kwargs):
         """Plots charts to compare numeric columns pairwise.
-
         Plots a pairplot (from seaborn) of numeric columns, with a distribution
         plot on the diagonal and a scatter plot for all other charts
-
         Args
         ----
         plot_numeric_columns: <list of str>
             List of numeric columns to plot, uses all if not specified
-
         alpha: <float>
             Transparency of the scatter plot
-
         Returns
         ----
         Resulting plot
@@ -325,30 +307,33 @@ class DataDriftDetector:
         df_post['_source'] = "Post"
 
         plot_df = pd.concat([df_prior, df_post])
+        plot_df.reset_index(drop=True, inplace=True)
 
         logger.info(
             "Plotting the following numeric column(s):", plot_numeric_columns
         )
 
         g = sns.pairplot(data=plot_df,
+                         kind=kind,
+                         diag_kind=diag_kind,
                          hue='_source',
-                         plot_kws={'alpha': alpha})
+                         plot_kws=plot_kws,
+                         diag_kws=diag_kws,
+                         grid_kws=grid_kws,
+                         **kwargs)
 
         return g
 
 
-    def plot_categorical(self, plot_categorical_columns=None):
+    def plot_categorical(self, plot_categorical_columns=None, **kwargs):
         """Plot histograms to compare categorical columns
-
         Args
         ----
         plot_categorical_columns: <list of str>
             List of categorical columns to plot, uses all if no specified
-
         Returns
         ----
         Resulting plot
-
         """
         assert isinstance(plot_categorical_columns, (list, type(None))),\
             "plot_categorical_columns should be of type list"
@@ -365,35 +350,38 @@ class DataDriftDetector:
             plot_categorical_columns
         )
 
-        fig, ax = plt.subplots(len(plot_categorical_columns), 2,
+        fig, ax = plt.subplots(len(plot_categorical_columns), 1,
                                figsize=(10, 5*len(plot_categorical_columns)))
-
+        
         for i, col in enumerate(plot_categorical_columns):
-
             if len(plot_categorical_columns) == 1:
-                _ax0 = ax[0]
-                _ax1 = ax[1]
+                _ax = ax[0]
             elif len(plot_categorical_columns) > 1:
-                _ax0 = ax[i, 0]
-                _ax1 = ax[i, 1]
+                _ax = ax[i]
 
-            (self.df_prior[col].value_counts(normalize=True)
-                               .rename("Proportion")
-                               .sort_index()
-                               .reset_index()
-                               .pipe((sns.barplot, "data"),
-                                     x="index", y="Proportion", ax=_ax0))
-            _ax0.set_title(col + ", prior")
-            _ax0.set(xlabel=col)
-            (self.df_post[col].value_counts(normalize=True)
-                              .rename("Proportion")
-                              .sort_index()
-                              .reset_index()
-                              .pipe((sns.barplot, "data"),
-                                    x="index", y="Proportion", ax=_ax1))
-            _ax1.set(xlabel=col)
-            _ax1.set_title(col + ", post")
+            _p1 = (self.df_prior[col].value_counts(normalize=True)
+                                     .rename("Proportion")
+                                     .sort_index()
+                                     .reset_index())
+            _p2 = (self.df_post[col].value_counts(normalize=True)
+                                    .rename("Proportion")
+                                    .sort_index()
+                                    .reset_index())
+            _p1['_source'] = 'Prior'
+            _p2['_source'] = 'Post'
+            _p = pd.concat([_p1, _p2])
 
+            sns.barplot(x="index",
+                        y="Proportion",
+                        hue="_source",
+                        data=_p,
+                        ax=_ax,
+                        **kwargs)
+            _ax.legend(loc='upper right', title='_source')
+            _ax.set_xlabel(col)
+            _ax.tick_params(axis='x', labelrotation=90)
+
+        plt.tight_layout()
         plt.close(fig)
 
         return fig
@@ -417,50 +405,38 @@ class DataDriftDetector:
                                         'max_samples': [0.6, 0.8, 1],
                                         'max_depth': [3, 4, 5]}):
         """Compares the ML efficacy of the prior data to the post data
-
         For a given `target_column`, this builds a ML model separately with
         `df_prior` and `df_post`, and compares the performance
         between the 2 models on a test dataset. Test data will be drawn
         from `df_post` if it is not provided.
-
         Args
         ----
         target_column: <str>
             Target column to be used for ML
-
         test_data: <pandas.DataFrame>
             Pandas dataframe of test data, to do a train test split on the
             df_post if not provided
-
         OHE_columns: <list of str>
             List of columns to be one hot encoded, will be determined
             if not provided
-
         high_cardinality_columns: <list of str>
             List of columns to be cat boost encoded, will be
             determined if not provided
-
         OHE_columns_cutoff: <int>
             Number of unique labels in a column to determine OHE_columns &
             high_cardinality_columns if not provided. 
-
         random_state: <int>
             Random state for the RandomizedSearchCV & the model fitting
-
         train_size: <float>
             Proportion to split the df_post by, if test_data is not provided
-
         cv: <int>
             Number of cross validation folds to be used in the
             RandomizedSearchCV
-
         n_iter: <int>
             Number of iterations for the RandomizedSearchCV
-
         param_grid: <dictionary of parameters>
             Dictionary of hyperparameter values to be iterated by
             the RandomizedSearchCV
-
         Returns
         ----
         Returns a report of ML metrics between the prior model and the
@@ -530,13 +506,17 @@ class DataDriftDetector:
 
     def _ml_data_prep(self):
         """Prepares datasets for ML
-
         This does one hot encoding, cat boost encoding, and train test
         split (if necessary).
         """
 
         df_post = copy.deepcopy(self.df_post)
         train_prior = copy.deepcopy(self.df_prior)
+        
+        # drop NAs
+        cols = self.categorical_columns+self.numeric_columns
+        df_post = df_post[cols].dropna(how='any')
+        train_prior = train_prior[cols].dropna(how='any')
 
         # create test data if not provided
         if self.test_data is None:
@@ -555,6 +535,7 @@ class DataDriftDetector:
 
         else:
             test = copy.deepcopy(self.test_data)
+            test = test[cols].dropna(how='any')
             train_post = df_post
 
         # determine columns for OHE & CatBoost
@@ -695,7 +676,6 @@ class DataDriftDetector:
     def _eval_regressor(self):
         """
         Calculates the RMSE, MAE & R2 score of the prior and post model.
-
         Returns a pandas dataframe of the results.
         """
 
@@ -725,7 +705,6 @@ class DataDriftDetector:
         """
         Calculates the accuracy, precision, recall, F1 score & AUC of the
         prior and post model.
-
         Returns a pandas dataframe of the result.
         """
 
