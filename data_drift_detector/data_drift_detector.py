@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from category_encoders import CatBoostEncoder
 from scipy.spatial.distance import jensenshannon
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, ks_2samp, chisquare, wasserstein_distance
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.metrics import (r2_score, mean_absolute_error, precision_score,
@@ -121,7 +121,7 @@ class DataDriftDetector:
         """
         cat_res = {}
         num_res = {}
-        STEPS = 100
+        STEPS = 200
 
         for col in self.categorical_columns:
             # to ensure similar order, concat before computing probability
@@ -143,11 +143,23 @@ class DataDriftDetector:
             arr_ = arr.div(arr.sum(axis=0),axis=1)
             arr_.fillna(0, inplace=True)
 
-            # calculate distance
-            d = jensenshannon(arr_['prior'].to_numpy(),
-                              arr_['post'].to_numpy())
+            # calculate statistical distances
+            jsd = jensenshannon(arr_['prior'].to_numpy(),
+                                arr_['post'].to_numpy())
+            wd = wasserstein_distance(arr_['prior'].to_numpy(),
+                                      arr_['post'].to_numpy())
+            
+            # calculate test of similarity
+            pv = chisquare(arr_['post'].to_numpy(),
+                           arr_['prior'].to_numpy())[1]
 
-            cat_res.update({col: d})
+            cat_res.update({
+                col: {
+                    'jensen_shannon_distance': jsd,
+                    'wasserstein_distance': wd,
+                    'ks_2sample_test_p_value': pv
+                }
+            })
 
         for col in self.numeric_columns:
             # fit gaussian_kde
@@ -168,15 +180,20 @@ class DataDriftDetector:
             arr_prior = arr_prior_ / np.sum(arr_prior_)
             arr_post = arr_post_ / np.sum(arr_post_)
 
-            # calculate js d
-            d = jensenshannon(arr_prior, arr_post)
+            # calculate statistical distances
+            jsd = jensenshannon(arr_prior, arr_post)
+            wd = wasserstein_distance(arr_prior, arr_post)
+            
+            # calculate test of similarity
+            pv = ks_2samp(arr_prior, arr_post)[1]
 
-            num_res.update({col: d})
-
-        if len(num_res) > 0:
-            num_res = sorted(num_res.items(), key=lambda x:x[1], reverse=True)
-        if len(cat_res) > 0:
-            cat_res = sorted(cat_res.items(), key=lambda x:x[1], reverse=True)
+            num_res.update({
+                col: {
+                    'jensen_shannon_distance': jsd,
+                    'wasserstein_distance': wd,
+                    'chi_square_test_p_value': pv
+                }
+            })
 
         return {'categorical': dict(cat_res),
                 'numerical': dict(num_res)}
