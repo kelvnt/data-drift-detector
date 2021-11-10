@@ -21,11 +21,12 @@ class DataDriftDetector:
     """Compare differences between 2 datasets
     DataDriftDetector creates useful methods to compare 2 datasets,
     created to allow ease of measuring the fidelity between 2 datasets.
+    
     Methods
     ----
     calculate_drift:
         Calculates the distribution distance for each column between the
-        datasets with the jensen shannon metric
+        datasets
     plot_numeric_to_numeric:
         Creates a pairplot between the 2 datasets
     plot_categorical_to_numeric:
@@ -35,6 +36,7 @@ class DataDriftDetector:
         columns
     compare_ml_efficacy:
         Compares the ML efficacy of a model built between the 2 datasets
+
     Args
     ----
     df_prior: <pandas.DataFrame>
@@ -107,17 +109,17 @@ class DataDriftDetector:
 
 
     def calculate_drift(self):
-        """Calculates the jensen shannon distance between the 2 datasets
+        """Calculates metrics and test of similarity between the 2 datasets
         For categorical columns, the probability of each category will be
-        computed separately for `df_prior` and `df_post`, and the jensen
-        shannon distance between the 2 probability arrays will be computed. For
+        computed separately for `df_prior` and `df_post`, and the distance 
+        between the 2 probability arrays will be computed. For
         numeric columns, the values will first be fitted into a gaussian KDE
         separately for `df_prior` and `df_post`, and a probability array
-        will be sampled from them and compared with the jensen shannon distance
+        will be sampled from them
+        
         Returns
         ----
-        Sorted list of tuples containing the column name followed by the
-        computed jensen shannon distance
+        Dictionary of results
         """
         cat_res = {}
         num_res = {}
@@ -208,6 +210,7 @@ class DataDriftDetector:
         """Plots charts to compare categorical to numeric columns pairwise.
         Plots a pairgrid violin plot of categorical columns to numeric
         columns, split and colored by the source of datasets
+        
         Args
         ----
         plot_categorical_columns: <list of str>
@@ -217,10 +220,11 @@ class DataDriftDetector:
         categorical_on_y_axis: <boolean>
             Determines layout of resulting image - if True, categorical
             columns will be on the y axis
-        height: <int>
-            Height (in inches) of each facet
-        aspect: <float>
-            Aspect * height gives the width (in inches) of each facet.
+        grid_kws: <dict>
+            arguments to pass into the pair grid plot
+        plot_kws: <dict>
+            Arguments to pass into the violin plot
+
         Returns
         ----
         Resulting plot
@@ -301,12 +305,22 @@ class DataDriftDetector:
         """Plots charts to compare numeric columns pairwise.
         Plots a pairplot (from seaborn) of numeric columns, with a distribution
         plot on the diagonal and a scatter plot for all other charts
+
         Args
         ----
         plot_numeric_columns: <list of str>
             List of numeric columns to plot, uses all if not specified
-        alpha: <float>
-            Transparency of the scatter plot
+        kind: <str>
+            Plot kind for the pair plot
+        diag_kind: <str>
+            Plot kind for the diagonal plots
+        plot_kws: <dict>
+            Arguments for both the diagonal and grid plots
+        grid_kws: <dict>
+            Arguments for the grid plots
+        diag_kws: <dict>
+            Arguments for the diagonal plots
+
         Returns
         ----
         Resulting plot
@@ -344,10 +358,12 @@ class DataDriftDetector:
 
     def plot_categorical(self, plot_categorical_columns=None, **kwargs):
         """Plot histograms to compare categorical columns
+
         Args
         ----
         plot_categorical_columns: <list of str>
             List of categorical columns to plot, uses all if no specified
+
         Returns
         ----
         Resulting plot
@@ -426,6 +442,7 @@ class DataDriftDetector:
         `df_prior` and `df_post`, and compares the performance
         between the 2 models on a test dataset. Test data will be drawn
         from `df_post` if it is not provided.
+
         Args
         ----
         target_column: <str>
@@ -454,6 +471,7 @@ class DataDriftDetector:
         param_grid: <dictionary of parameters>
             Dictionary of hyperparameter values to be iterated by
             the RandomizedSearchCV
+
         Returns
         ----
         Returns a report of ML metrics between the prior model and the
