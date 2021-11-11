@@ -1,3 +1,5 @@
+
+   
 import numpy as np
 import pandas as pd
 import copy
@@ -36,7 +38,6 @@ class DataDriftDetector:
         columns
     compare_ml_efficacy:
         Compares the ML efficacy of a model built between the 2 datasets
-
     Args
     ----
     df_prior: <pandas.DataFrame>
@@ -70,8 +71,8 @@ class DataDriftDetector:
         assert isinstance(numeric_columns, (list, type(None))),\
             "numeric_columns should be of type list"
 
-        df_prior_ = copy.deepcopy(df_prior)
-        df_post_ = copy.deepcopy(df_post)
+        df_prior_ = df_prior.copy()
+        df_post_ = df_post.copy()
 
         if categorical_columns is None:
             categorical_columns = (
@@ -224,7 +225,6 @@ class DataDriftDetector:
             arguments to pass into the pair grid plot
         plot_kws: <dict>
             Arguments to pass into the violin plot
-
         Returns
         ----
         Resulting plot
@@ -305,7 +305,6 @@ class DataDriftDetector:
         """Plots charts to compare numeric columns pairwise.
         Plots a pairplot (from seaborn) of numeric columns, with a distribution
         plot on the diagonal and a scatter plot for all other charts
-
         Args
         ----
         plot_numeric_columns: <list of str>
@@ -320,7 +319,6 @@ class DataDriftDetector:
             Arguments for the grid plots
         diag_kws: <dict>
             Arguments for the diagonal plots
-
         Returns
         ----
         Resulting plot
@@ -358,12 +356,10 @@ class DataDriftDetector:
 
     def plot_categorical(self, plot_categorical_columns=None, **kwargs):
         """Plot histograms to compare categorical columns
-
         Args
         ----
         plot_categorical_columns: <list of str>
             List of categorical columns to plot, uses all if no specified
-
         Returns
         ----
         Resulting plot
@@ -388,7 +384,7 @@ class DataDriftDetector:
         
         for i, col in enumerate(plot_categorical_columns):
             if len(plot_categorical_columns) == 1:
-                _ax = ax[0]
+                _ax = ax
             elif len(plot_categorical_columns) > 1:
                 _ax = ax[i]
 
@@ -442,7 +438,6 @@ class DataDriftDetector:
         `df_prior` and `df_post`, and compares the performance
         between the 2 models on a test dataset. Test data will be drawn
         from `df_post` if it is not provided.
-
         Args
         ----
         target_column: <str>
@@ -471,7 +466,6 @@ class DataDriftDetector:
         param_grid: <dictionary of parameters>
             Dictionary of hyperparameter values to be iterated by
             the RandomizedSearchCV
-
         Returns
         ----
         Returns a report of ML metrics between the prior model and the
@@ -545,8 +539,8 @@ class DataDriftDetector:
         split (if necessary).
         """
 
-        df_post = copy.deepcopy(self.df_post)
-        train_prior = copy.deepcopy(self.df_prior)
+        df_post = self.df_post.copy()
+        train_prior = self.df_prior.copy()
         
         # drop NAs
         cols = self.categorical_columns+self.numeric_columns
@@ -565,11 +559,11 @@ class DataDriftDetector:
             df_post = shuffle(df_post)
             n_split = int(len(df_post)*self.train_size)
 
-            train_post = df_post.iloc[:n_split]
-            test = df_post.iloc[n_split:]
+            train_post = df_post.iloc[:n_split].copy()
+            test = df_post.iloc[n_split:].copy()
 
         else:
-            test = copy.deepcopy(self.test_data)
+            test = self.test_data.copy()
             test = test[cols].dropna(how='any')
             train_post = df_post
 
@@ -597,8 +591,8 @@ class DataDriftDetector:
         train_post = df[df.source == 'Train Post'].drop('source', axis=1)
 
         # CatBoostEncoder for high cardinality columns
-        test_prior = copy.deepcopy(test)
-        test_post = copy.deepcopy(test)
+        test_prior = test.copy()
+        test_post = test.copy()
 
         tf_prior = CatBoostEncoder(cols=high_cardinality_columns,
                                    random_state=self.random_state)
