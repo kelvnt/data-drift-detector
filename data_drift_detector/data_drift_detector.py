@@ -70,8 +70,8 @@ class DataDriftDetector:
         assert isinstance(numeric_columns, (list, type(None))),\
             "numeric_columns should be of type list"
 
-        df_prior_ = df_prior.copy()
-        df_post_ = df_post.copy()
+        df_prior_ = copy.deepcopy(df_prior)
+        df_post_ = copy.deepcopy(df_post)
 
         if categorical_columns is None:
             categorical_columns = (
@@ -159,7 +159,7 @@ class DataDriftDetector:
                 col: {
                     'jensen_shannon_distance': jsd,
                     'wasserstein_distance': wd,
-                    'ks_2sample_test_p_value': pv
+                    'chi_square_test_p_value': pv
                 }
             })
 
@@ -193,7 +193,7 @@ class DataDriftDetector:
                 col: {
                     'jensen_shannon_distance': jsd,
                     'wasserstein_distance': wd,
-                    'chi_square_test_p_value': pv
+                    'ks_2sample_test_p_value': pv
                 }
             })
 
@@ -388,7 +388,7 @@ class DataDriftDetector:
         
         for i, col in enumerate(plot_categorical_columns):
             if len(plot_categorical_columns) == 1:
-                _ax = ax
+                _ax = ax[0]
             elif len(plot_categorical_columns) > 1:
                 _ax = ax[i]
 
@@ -545,8 +545,8 @@ class DataDriftDetector:
         split (if necessary).
         """
 
-        df_post = self.df_post.copy()
-        train_prior = self.df_prior.copy()
+        df_post = copy.deepcopy(self.df_post)
+        train_prior = copy.deepcopy(self.df_prior)
         
         # drop NAs
         cols = self.categorical_columns+self.numeric_columns
@@ -565,11 +565,11 @@ class DataDriftDetector:
             df_post = shuffle(df_post)
             n_split = int(len(df_post)*self.train_size)
 
-            train_post = df_post.iloc[:n_split].copy()
-            test = df_post.iloc[n_split:].copy()
+            train_post = df_post.iloc[:n_split]
+            test = df_post.iloc[n_split:]
 
         else:
-            test = self.test_data.copy()
+            test = copy.deepcopy(self.test_data)
             test = test[cols].dropna(how='any')
             train_post = df_post
 
@@ -597,8 +597,8 @@ class DataDriftDetector:
         train_post = df[df.source == 'Train Post'].drop('source', axis=1)
 
         # CatBoostEncoder for high cardinality columns
-        test_prior = test.copy()
-        test_post = test.copy()
+        test_prior = copy.deepcopy(test)
+        test_post = copy.deepcopy(test)
 
         tf_prior = CatBoostEncoder(cols=high_cardinality_columns,
                                    random_state=self.random_state)
