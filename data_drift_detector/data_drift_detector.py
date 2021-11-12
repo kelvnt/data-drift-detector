@@ -140,6 +140,7 @@ class DataDriftDetector:
                        .reset_index()
                        .pivot(index=col, columns='_source')
                        .droplevel(0, axis=1)
+                       .pipe(lambda df: df.loc[df.sum(axis=1).sort_values(ascending=False).index, :])
                   )
             arr_ = arr.div(arr.sum(axis=0),axis=1)
             arr_.fillna(0, inplace=True)
