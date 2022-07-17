@@ -59,8 +59,8 @@ class DataDriftDetector:
         assert isinstance(df_prior, pd.DataFrame),\
             "df_prior should be a pandas dataframe"
         assert isinstance(df_post, pd.DataFrame),\
-            "df_prior should be a pandas dataframe"
-        assert all(df_prior.columns == df_post.columns),\
+            "df_post should be a pandas dataframe"
+        assert sorted(df_prior.columns) == sorted(df_post.columns),\
             "df_prior and df_post should have the same column names"
         assert all(df_prior.dtypes == df_post.dtypes),\
             "df_prior and df_post should have the same column types"
@@ -78,8 +78,8 @@ class DataDriftDetector:
                 df_prior_.dtypes[c] == 'object']
             )
             logger.info(
-                "Identified categorical column(s): ",
-                categorical_columns
+                "Identified categorical column(s): {}".format(
+                ", ".join(categorical_columns))
             )
 
         df_prior_[categorical_columns] = (
@@ -95,7 +95,9 @@ class DataDriftDetector:
                 [c for c in df_prior_.columns if
                  df_prior_.dtypes[c] in num_types]
             )
-            logger.info("Identified numeric column(s): ", numeric_columns)
+            logger.info("Identified numeric column(s): {}".format(
+                ", ".join(numeric_columns))
+            )
 
         df_prior_[numeric_columns] = df_prior_[numeric_columns].astype(float)
         df_post_[numeric_columns] = df_post_[numeric_columns].astype(float)
@@ -253,15 +255,17 @@ class DataDriftDetector:
         df_post["_source"] = "Post"
 
         plot_df = pd.concat([df_prior, df_post])
-
-        logger.info(
-            "Plotting the following categorical column(s):",
-            plot_categorical_columns,
-            "Against the following numeric column(s):",
-             plot_numeric_columns,
-             "Categorical columns with high cardinality (>20 unique values)",
-             "are not plotted."
+        
+        msg = (
+            "Plotting the following categorical column(s): " +
+            ", ".join(plot_categorical_columns) +
+            "\nAgainst the following numeric column(s):" +
+            ", ".join(plot_numeric_columns) +
+            "\nCategorical columns with high cardinality (>20 unique values)" +
+            " are not plotted."
         )
+
+        logger.info(msg)
 
         # violinplot does not treat numeric string cols as string - error
         # sln: added a whitespace to ensure it is read as a string
@@ -338,7 +342,8 @@ class DataDriftDetector:
         plot_df.reset_index(drop=True, inplace=True)
 
         logger.info(
-            "Plotting the following numeric column(s):", plot_numeric_columns
+            "Plotting the following numeric column(s): {}".format(
+            ", ".join(plot_numeric_columns))
         )
 
         g = sns.pairplot(data=plot_df,
@@ -374,8 +379,8 @@ class DataDriftDetector:
             )
 
         logger.info(
-            "Plotting the following categorical column(s):",
-            plot_categorical_columns
+            "Plotting the following categorical column(s): {}".format(
+            ", ".join(plot_categorical_columns))
         )
 
         fig, ax = plt.subplots(len(plot_categorical_columns), 1,
@@ -549,11 +554,13 @@ class DataDriftDetector:
         # create test data if not provided
         if self.test_data is None:
 
-            logger.info(
-                "No test data was provided. Test data will be created with",
-                "a {}-{} ".format(self.train_size*100, (1-self.train_size)*100),
-                "shuffle split from the post data set."
+            msg = (
+                "No test data was provided. Test data will be created with " +
+                "a {}-{} shuffle split from the post data set.".format(
+                    str(round(self.train_size*100, 0)),
+                    str(round((1-self.train_size)*100, 0)))
             )
+            logger.info(msg)
 
             df_post = shuffle(df_post)
             n_split = int(len(df_post)*self.train_size)
@@ -573,9 +580,9 @@ class DataDriftDetector:
                                  if col != self.target_column]
 
         if len(OHE_columns) > 0:
-            logger.info("One hot encoded columns: ", OHE_columns)
+            logger.info("One hot encoded columns: {}".format(", ".join(OHE_columns)))
         if len(high_cardinality_columns) > 0:
-            logger.info("Cat boost encoded columns: ", high_cardinality_columns)
+            logger.info("Cat boost encoded columns: {}".format(", ".join(high_cardinality_columns)))
 
         # concat and then OHE to ensure columns match
         train_prior['source'] = "Train Prior"
@@ -654,14 +661,16 @@ class DataDriftDetector:
 
         model_prior.fit(self.X_train_prior, self.y_train_prior)
         model_post.fit(self.X_train_post, self.y_train_post)
-
-        logger.info(
-            "A RandomForestRegressor with a RandomizedSearchCV was trained.",
-            "The final model (trained with prior data) parameters are:",
-            model_prior.best_estimator_,
-            "The final model (trained with post data) parameters are:",
-            model_post.best_estimator_
+        
+        msg = (
+            "A RandomForestRegressor with a RandomizedSearchCV was trained." +
+            "\nThe final model (trained with prior data) parameters are: " +
+            json.dumps(model_prior.best_params_) +
+            "\nThe final model (trained with post data) parameters are: " +
+            json.dumps(model_post.best_params_)
         )
+
+        logger.info(msg)
 
         self.model_prior = model_prior
         self.model_post = model_post
@@ -688,14 +697,16 @@ class DataDriftDetector:
 
         model_prior.fit(self.X_train_prior, self.y_train_prior)
         model_post.fit(self.X_train_post, self.y_train_post)
-
-        logger.info(
-            "A RandomForestClassifier with a RandomizedSearchCV was trained.",
-            "The final model (trained with prior data) parameters are:",
-            model_prior.best_estimator_,
-            "The final model (trained with post data) parameters are:",
-            model_post.best_estimator_
+        
+        msg = (
+            "A RandomForestClassifier with a RandomizedSearchCV was trained." +
+            "\nThe final model (trained with prior data) parameters are: " +
+            json.dumps(model_prior.best_params_) +
+            "\nThe final model (trained with post data) parameters are: " +
+            json.dumps(model_post.best_params_)
         )
+
+        logger.info(msg)
 
         self.model_prior = model_prior
         self.model_post = model_post
