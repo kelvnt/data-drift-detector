@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import copy
+import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 from category_encoders import CatBoostEncoder
@@ -62,7 +63,7 @@ class DataDriftDetector:
             "df_post should be a pandas dataframe"
         assert sorted(df_prior.columns) == sorted(df_post.columns),\
             "df_prior and df_post should have the same column names"
-        assert all(df_prior.dtypes == df_post.dtypes),\
+        assert all(df_prior.dtype.sort_index() == df_post.dtypes.sort_index()),\
             "df_prior and df_post should have the same column types"
         assert isinstance(categorical_columns, (list, type(None))),\
             "categorical_columns should be of type list"
@@ -106,7 +107,7 @@ class DataDriftDetector:
         self.numeric_columns = numeric_columns
 
         self.df_prior = df_prior_
-        self.df_post = df_post_
+        self.df_post = df_post_[df_prior_.columns]
 
 
     def calculate_drift(self):
