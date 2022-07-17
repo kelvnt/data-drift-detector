@@ -63,7 +63,7 @@ class DataDriftDetector:
             "df_post should be a pandas dataframe"
         assert sorted(df_prior.columns) == sorted(df_post.columns),\
             "df_prior and df_post should have the same column names"
-        assert all(df_prior.dtype.sort_index() == df_post.dtypes.sort_index()),\
+        assert all(df_prior.dtypes.sort_index() == df_post.dtypes.sort_index()),\
             "df_prior and df_post should have the same column types"
         assert isinstance(categorical_columns, (list, type(None))),\
             "categorical_columns should be of type list"
