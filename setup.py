@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="data-drift-detector",
-    version="0.0.9",
+    version="0.0.10",
     author="Kelvin Tay",
     author_email="btkelvin@gmail.com",
     description="Compare differences between 2 datasets to identify data drift",

@@ -110,7 +110,7 @@ class DataDriftDetector:
         self.df_post = df_post_[df_prior_.columns]
 
 
-    def calculate_drift(self):
+    def calculate_drift(self, steps=100):
         """Calculates metrics and test of similarity between the 2 datasets
         For categorical columns, the probability of each category will be
         computed separately for `df_prior` and `df_post`, and the distance 
@@ -119,13 +119,18 @@ class DataDriftDetector:
         separately for `df_prior` and `df_post`, and a probability array
         will be sampled from them
         
+        Args
+        ----
+        steps: int
+            Number of steps to take to sample for the fitted KDE for numeric
+            columns
+
         Returns
         ----
         Dictionary of results
         """
         cat_res = {}
         num_res = {}
-        STEPS = 200
 
         for col in self.categorical_columns:
             # to ensure similar order, concat before computing probability
@@ -176,7 +181,7 @@ class DataDriftDetector:
             # get range of values
             min_ = min(col_prior.min(), col_post.min())
             max_ = max(col_prior.max(), col_post.max())
-            range_ = np.linspace(start=min_, stop=max_, num=STEPS)
+            range_ = np.linspace(start=min_, stop=max_, num=steps)
 
             # sample range from KDE
             arr_prior_ = kde_prior(range_)
