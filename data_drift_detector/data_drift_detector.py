@@ -7,6 +7,7 @@ import seaborn as sns
 from category_encoders import CatBoostEncoder
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import gaussian_kde, ks_2samp, chisquare, wasserstein_distance
+from scipy.special import rel_entr
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.metrics import (r2_score, mean_absolute_error, precision_score,
@@ -150,24 +151,41 @@ class DataDriftDetector:
                        .droplevel(0, axis=1)
                        .pipe(lambda df: df.loc[df.sum(axis=1).sort_values(ascending=False).index, :])
                   )
+
             arr_ = arr.div(arr.sum(axis=0),axis=1)
             arr_.fillna(0, inplace=True)
 
             # calculate statistical distances
+            kl_post_prior = sum(
+                rel_entr(arr_['post'].to_numpy(), arr_['prior'].to_numpy())
+            )
+            kl_prior_post = sum(
+                rel_entr(arr_['prior'].to_numpy(), arr_['post'].to_numpy())
+            )
+
             jsd = jensenshannon(arr_['prior'].to_numpy(),
                                 arr_['post'].to_numpy())
             wd = wasserstein_distance(arr_['prior'].to_numpy(),
                                       arr_['post'].to_numpy())
+
+            # chisquare test requires at least 5 
+            arr = arr.loc[arr.sum(axis=1) >= 5,]
+            arr_ = arr.div(arr.sum(axis=0),axis=1)
+            arr_.fillna(0, inplace=True)
             
             # calculate test of similarity
-            pv = chisquare(arr_['post'].to_numpy(),
-                           arr_['prior'].to_numpy())[1]
+            cs_test = chisquare(arr_['post'].to_numpy(),
+                                arr_['prior'].to_numpy())
 
             cat_res.update({
                 col: {
+                    'chi_square_test_statistic': cs_test[0],
+                    'chi_square_test_p_value': cs_test[1],
+                    'kl_divergence_post_given_prior': kl_post_prior,
+                    'kl_divergence_prior_given_post': kl_prior_post,
                     'jensen_shannon_distance': jsd,
-                    'wasserstein_distance': wd,
-                    'chi_square_test_p_value': pv
+                    'wasserstein_distance': wd
+                    
                 }
             })
 
@@ -184,8 +202,8 @@ class DataDriftDetector:
             range_ = np.linspace(start=min_, stop=max_, num=steps)
 
             # sample range from KDE
-            arr_prior_ = kde_prior(range_)
-            arr_post_ = kde_post(range_)
+            arr_prior_ = kde_prior.evaluate(range_)
+            arr_post_ = kde_post.evaluate(range_)
 
             arr_prior = arr_prior_ / np.sum(arr_prior_)
             arr_post = arr_post_ / np.sum(arr_post_)
@@ -195,13 +213,15 @@ class DataDriftDetector:
             wd = wasserstein_distance(arr_prior, arr_post)
             
             # calculate test of similarity
-            pv = ks_2samp(arr_prior, arr_post)[1]
+            ks_test = ks_2samp(arr_prior, arr_post)
 
             num_res.update({
                 col: {
+                    'ks_2sample_test_statistic': ks_test[0],
+                    'ks_2sample_test_p_value': ks_test[1],
                     'jensen_shannon_distance': jsd,
-                    'wasserstein_distance': wd,
-                    'ks_2sample_test_p_value': pv
+                    'wasserstein_distance': wd
+                    
                 }
             })
 
