@@ -168,8 +168,6 @@ class DataDriftDetector:
             wd = wasserstein_distance(arr_['prior'].to_numpy(),
                                       arr_['post'].to_numpy())
 
-            # chisquare test requires at least 5 
-            arr = arr.loc[arr.sum(axis=1) >= 5,]
             arr['post'] = arr['post'] / arr['post'].sum() * arr['prior'].sum()
             arr.fillna(0, inplace=True)
             
