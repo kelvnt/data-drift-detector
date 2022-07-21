@@ -170,12 +170,12 @@ class DataDriftDetector:
 
             # chisquare test requires at least 5 
             arr = arr.loc[arr.sum(axis=1) >= 5,]
-            arr_ = arr.div(arr.sum(axis=0),axis=1)
-            arr_.fillna(0, inplace=True)
+            arr['post'] = arr['post'] / arr['post'].sum() * arr['prior'].sum()
+            arr.fillna(0, inplace=True)
             
             # calculate test of similarity
-            cs_test = chisquare(arr_['post'].to_numpy(),
-                                arr_['prior'].to_numpy())
+            cs_test = chisquare(arr['post'].to_numpy(),
+                                arr['prior'].to_numpy())
 
             cat_res.update({
                 col: {
