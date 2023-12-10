@@ -428,7 +428,7 @@ class DataDriftDetector:
             _p2['_source'] = 'Post'
             _p = pd.concat([_p1, _p2])
 
-            sns.barplot(x="index",
+            sns.barplot(x=_p.index,
                         y="Proportion",
                         hue="_source",
                         data=_p,
