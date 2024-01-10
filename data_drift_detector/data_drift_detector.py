@@ -603,56 +603,55 @@ class DataDriftDetector:
         high_cardinality_columns = [col for col in self.high_cardinality_columns
                                  if col != self.target_column]
 
-        if len(OHE_columns) > 0:
-            logger.info("One hot encoded columns: {}".format(", ".join(OHE_columns)))
-        if len(high_cardinality_columns) > 0:
-            logger.info("Cat boost encoded columns: {}".format(", ".join(high_cardinality_columns)))
-
         # concat and then OHE to ensure columns match
         train_prior['source'] = "Train Prior"
         test['source'] = "Test"
         train_post['source'] = "Train Post"
 
         df = pd.concat([train_prior, test, train_post])
-        df = pd.get_dummies(data=df, columns=OHE_columns)
+        if len(OHE_columns) > 0:
+            logger.info("One hot encoded columns: {}".format(", ".join(OHE_columns)))
+            df = pd.get_dummies(data=df, columns=OHE_columns)
 
         train_prior = df[df.source == 'Train Prior'].drop('source', axis=1)
         test = df[df.source == 'Test'].drop('source', axis=1)
         train_post = df[df.source == 'Train Post'].drop('source', axis=1)
 
-        # CatBoostEncoder for high cardinality columns
         test_prior = test.copy()
         test_post = test.copy()
 
-        tf_prior = CatBoostEncoder(cols=high_cardinality_columns,
-                                   random_state=self.random_state)
-        tf_post = CatBoostEncoder(cols=high_cardinality_columns,
-                                  random_state=self.random_state)
+        if len(high_cardinality_columns) > 0:
+            logger.info("Cat boost encoded columns: {}".format(", ".join(high_cardinality_columns)))
+            # CatBoostEncoder for high cardinality columns
+            tf_prior = CatBoostEncoder(cols=high_cardinality_columns,
+                                    random_state=self.random_state)
+            tf_post = CatBoostEncoder(cols=high_cardinality_columns,
+                                    random_state=self.random_state)
 
-        train_prior[high_cardinality_columns] = (
-            tf_prior.fit_transform(train_prior[high_cardinality_columns],
-                                   train_prior[self.target_column])
-        )
-        test_prior[high_cardinality_columns] = (
-            tf_prior.transform(test_prior[high_cardinality_columns],
-                               test_prior[self.target_column])
-        )
-        train_post[high_cardinality_columns] = (
-            tf_post.fit_transform(train_post[high_cardinality_columns],
-                                  train_post[self.target_column])
-        )
-        test_post[high_cardinality_columns] = (
-            tf_post.transform(test_post[high_cardinality_columns],
-                              test_post[self.target_column])
-        )
+            train_prior[high_cardinality_columns] = (
+                tf_prior.fit_transform(train_prior[high_cardinality_columns],
+                                    train_prior[self.target_column])
+            )
+            test_prior[high_cardinality_columns] = (
+                tf_prior.transform(test_prior[high_cardinality_columns],
+                                test_prior[self.target_column])
+            )
+            train_post[high_cardinality_columns] = (
+                tf_post.fit_transform(train_post[high_cardinality_columns],
+                                    train_post[self.target_column])
+            )
+            test_post[high_cardinality_columns] = (
+                tf_post.transform(test_post[high_cardinality_columns],
+                                test_post[self.target_column])
+            )
 
         X_train_prior = train_prior.drop(self.target_column, axis=1).astype(float)
-        y_train_prior = train_prior[self.target_column].astype(float)
+        y_train_prior = train_prior[self.target_column]
         X_test_prior = test_prior.drop(self.target_column, axis=1).astype(float)
-        y_test = test[self.target_column].astype(float)
+        y_test = test[self.target_column]
 
         X_train_post = train_post.drop(self.target_column, axis=1).astype(float)
-        y_train_post = train_post[self.target_column].astype(float)
+        y_train_post = train_post[self.target_column]
         X_test_post = test_post.drop(self.target_column, axis=1).astype(float)
 
         self.X_train_prior = X_train_prior
@@ -774,7 +773,7 @@ class DataDriftDetector:
         y_pred_prior = self.model_prior.predict(self.X_test_prior)
         y_pred_post = self.model_post.predict(self.X_test_post)
 
-        y_test_ = pd.DataFrame(self.y_test)
+        y_test = pd.DataFrame(self.y_test)
         y_pred_prior = pd.DataFrame(y_pred_prior, columns=y_test.columns)
         y_pred_post = pd.DataFrame(y_pred_post, columns=y_test.columns)
 
