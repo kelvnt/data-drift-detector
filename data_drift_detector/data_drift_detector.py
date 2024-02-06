@@ -458,15 +458,9 @@ class DataDriftDetector:
             OHE_columns=None,
             high_cardinality_columns=None,
             OHE_columns_cutoff=5,
-            random_state=None,
             train_size=0.7,
-            cv=3,
-            n_iter=5,
-            param_grid={
-                'n_estimators': [100, 200],
-                'max_samples': [0.6, 0.8, 1],
-                'max_depth': [3, 4, 5]
-                }
+            model_prior=None,
+            model_post=None
             ):
         """Compares the ML efficacy of the prior data to the post data
         For a given `target_column`, this builds a ML model separately with
@@ -488,19 +482,15 @@ class DataDriftDetector:
             determined if not provided
         OHE_columns_cutoff: <int>
             Number of unique labels in a column to determine OHE_columns &
-            high_cardinality_columns if not provided. 
-        random_state: <int>
-            Random state for the RandomizedSearchCV & the model fitting
+            high_cardinality_columns if not provided.
         train_size: <float>
             Proportion to split the df_post by, if test_data is not provided
-        cv: <int>
-            Number of cross validation folds to be used in the
-            RandomizedSearchCV
-        n_iter: <int>
-            Number of iterations for the RandomizedSearchCV
-        param_grid: <dictionary of parameters>
-            Dictionary of hyperparameter values to be iterated by
-            the RandomizedSearchCV
+        model_prior: <class>
+            A model with minimally a `fit` and `predict` methods used to train the prior
+            dataset. If none is provided, a default is used
+        model_post: <class>
+            A model with minimally a `fit` and `predict` methods used to train the post
+            dataset. If none is provided, a default is used
         Returns
         ----
         Returns a report of ML metrics between the prior model and the
@@ -517,16 +507,10 @@ class DataDriftDetector:
         assert isinstance(high_cardinality_columns, (list, type(None))),\
             "high_cardinality_columns should be of type list"
 
-
-        # TODO: - Allow choice of model?
-        #       - Allow choice of encoding for high cardinality cols?
-
         self.target_column = target_column
         self.train_size = train_size
-        self.random_state = random_state
-        self.cv = cv
-        self.n_iter = n_iter
-        self.param_grid = param_grid
+        self.model_prior = model_prior
+        self.model_post = model_post
 
         col_nunique = self.df_prior.nunique()
 
@@ -558,11 +542,63 @@ class DataDriftDetector:
         self._ml_data_prep()
 
         if target_column in self.categorical_columns:
-            self._build_classifier()
+            # set default model if not provided
+            if self.model_prior == None:
+                self.model_prior = RandomizedSearchCV(
+                    estimator=RandomForestClassifier(random_state=42),
+                    param_distributions={
+                        "n_estimators": [100, 200],
+                        "max_samples": [0.6, 0.8, 1],
+                        "max_depth": [3, 4, 5]
+                    },
+                    n_iter=10,
+                    cv=10,
+                    random_state=42
+                )
+            if self.model_post == None:
+                self.model_post = RandomizedSearchCV(
+                    estimator=RandomForestClassifier(random_state=42),
+                    param_distributions={
+                        "n_estimators": [100, 200],
+                        "max_samples": [0.6, 0.8, 1],
+                        "max_depth": [3, 4, 5]
+                    },
+                    n_iter=10,
+                    cv=10,
+                    random_state=42
+                )
+            # actually fit and evaluate model
+            self._fit_model()
             self._eval_classifier()
 
         elif target_column in self.numeric_columns:
-            self._build_regressor()
+            # set default model if not provided
+            if self.model_prior == None:
+                self.model_prior = RandomizedSearchCV(
+                    estimator=RandomForestRegressor(random_state=42),
+                    param_distributions={
+                        "n_estimators": [100, 200],
+                        "max_samples": [0.6, 0.8, 1],
+                        "max_depth": [3, 4, 5]
+                    },
+                    n_iter=10,
+                    cv=10,
+                    random_state=42
+                )
+            if self.model_post == None:
+                self.model_post = RandomizedSearchCV(
+                    estimator=RandomForestRegressor(random_state=42),
+                    param_distributions={
+                        "n_estimators": [100, 200],
+                        "max_samples": [0.6, 0.8, 1],
+                        "max_depth": [3, 4, 5]
+                    },
+                    n_iter=10,
+                    cv=10,
+                    random_state=42
+                )
+            # actually fit and evaluate model
+            self._fit_model()
             self._eval_regressor()
 
         return self.ml_report
@@ -669,82 +705,11 @@ class DataDriftDetector:
         self.X_test_post = X_test_post
 
 
-    def _build_regressor(self):
-        """Builds a random forest regressor with a RandomizedSearchCV
+    def _fit_model(self):
+        """Fits the ML models
         """
-
-        model_prior_ = RandomForestRegressor(random_state=self.random_state)
-        model_post_ = RandomForestRegressor(random_state=self.random_state)
-
-        model_prior = RandomizedSearchCV(
-            model_prior_,
-            self.param_grid,
-            n_iter=self.n_iter,
-            cv=self.cv,
-            random_state=self.random_state
-        )
-        model_post = RandomizedSearchCV(
-            model_post_,
-            self.param_grid,
-            n_iter=self.n_iter,
-            cv=self.cv,
-            random_state=self.random_state
-        )
-
-        model_prior.fit(self.X_train_prior, self.y_train_prior)
-        model_post.fit(self.X_train_post, self.y_train_post)
-        
-        msg = (
-            "A RandomForestRegressor with a RandomizedSearchCV was trained." +
-            "\nThe final model (trained with prior data) parameters are: " +
-            json.dumps(model_prior.best_params_) +
-            "\nThe final model (trained with post data) parameters are: " +
-            json.dumps(model_post.best_params_)
-        )
-
-        logger.info(msg)
-
-        self.model_prior = model_prior
-        self.model_post = model_post
-
-
-    def _build_classifier(self):
-        """Build a random forest classifier with a RandomizedSearchCV
-        """
-
-        model_prior_ = RandomForestClassifier(random_state=self.random_state)
-        model_post_ = RandomForestClassifier(random_state=self.random_state)
-
-        model_prior = RandomizedSearchCV(
-            model_prior_,
-            self.param_grid,
-            n_iter=self.n_iter,
-            cv=self.cv,
-            random_state=self.random_state
-        )
-        model_post = RandomizedSearchCV(
-            model_post_,
-            self.param_grid,
-            n_iter=self.n_iter,
-            cv=self.cv,
-            random_state=self.random_state
-        )
-
-        model_prior.fit(self.X_train_prior, self.y_train_prior)
-        model_post.fit(self.X_train_post, self.y_train_post)
-        
-        msg = (
-            "A RandomForestClassifier with a RandomizedSearchCV was trained." +
-            "\nThe final model (trained with prior data) parameters are: " +
-            json.dumps(model_prior.best_params_) +
-            "\nThe final model (trained with post data) parameters are: " +
-            json.dumps(model_post.best_params_)
-        )
-
-        logger.info(msg)
-
-        self.model_prior = model_prior
-        self.model_post = model_post
+        self.model_prior.fit(self.X_train_prior, self.y_train_prior)
+        self.model_post.fit(self.X_train_post, self.y_train_post)
 
 
     def _eval_regressor(self):
