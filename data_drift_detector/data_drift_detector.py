@@ -543,7 +543,7 @@ class DataDriftDetector:
 
         if target_column in self.categorical_columns:
             # set default model if not provided
-            if self.model_prior == None:
+            if self.model_prior is None:
                 self.model_prior = RandomizedSearchCV(
                     estimator=RandomForestClassifier(random_state=42),
                     param_distributions={
@@ -555,7 +555,7 @@ class DataDriftDetector:
                     cv=10,
                     random_state=42
                 )
-            if self.model_post == None:
+            if self.model_post is None:
                 self.model_post = RandomizedSearchCV(
                     estimator=RandomForestClassifier(random_state=42),
                     param_distributions={
@@ -573,7 +573,7 @@ class DataDriftDetector:
 
         elif target_column in self.numeric_columns:
             # set default model if not provided
-            if self.model_prior == None:
+            if self.model_prior is None:
                 self.model_prior = RandomizedSearchCV(
                     estimator=RandomForestRegressor(random_state=42),
                     param_distributions={
@@ -585,7 +585,7 @@ class DataDriftDetector:
                     cv=10,
                     random_state=42
                 )
-            if self.model_post == None:
+            if self.model_post is None:
                 self.model_post = RandomizedSearchCV(
                     estimator=RandomForestRegressor(random_state=42),
                     param_distributions={
