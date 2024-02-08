@@ -487,10 +487,10 @@ class DataDriftDetector:
             Proportion to split the df_post by, if test_data is not provided
         model_prior: <class>
             A model with minimally a `fit` and `predict` methods used to train the prior
-            dataset. If none is provided, a default is used
+            dataset. If none is provided, a default model will be used
         model_post: <class>
             A model with minimally a `fit` and `predict` methods used to train the post
-            dataset. If none is provided, a default is used
+            dataset. If none is provided, a default model will be used
         Returns
         ----
         Returns a report of ML metrics between the prior model and the
@@ -544,29 +544,9 @@ class DataDriftDetector:
         if target_column in self.categorical_columns:
             # set default model if not provided
             if self.model_prior is None:
-                self.model_prior = RandomizedSearchCV(
-                    estimator=RandomForestClassifier(random_state=42),
-                    param_distributions={
-                        "n_estimators": [100, 200],
-                        "max_samples": [0.6, 0.8, 1],
-                        "max_depth": [3, 4, 5]
-                    },
-                    n_iter=10,
-                    cv=10,
-                    random_state=42
-                )
+                self.model_prior = self._default_classifier()
             if self.model_post is None:
-                self.model_post = RandomizedSearchCV(
-                    estimator=RandomForestClassifier(random_state=42),
-                    param_distributions={
-                        "n_estimators": [100, 200],
-                        "max_samples": [0.6, 0.8, 1],
-                        "max_depth": [3, 4, 5]
-                    },
-                    n_iter=10,
-                    cv=10,
-                    random_state=42
-                )
+                self.model_post = self._default_classifier()
             # actually fit and evaluate model
             self._fit_model()
             self._eval_classifier()
@@ -574,34 +554,46 @@ class DataDriftDetector:
         elif target_column in self.numeric_columns:
             # set default model if not provided
             if self.model_prior is None:
-                self.model_prior = RandomizedSearchCV(
-                    estimator=RandomForestRegressor(random_state=42),
-                    param_distributions={
-                        "n_estimators": [100, 200],
-                        "max_samples": [0.6, 0.8, 1],
-                        "max_depth": [3, 4, 5]
-                    },
-                    n_iter=10,
-                    cv=10,
-                    random_state=42
-                )
+                self.model_prior = self._default_regressor()
             if self.model_post is None:
-                self.model_post = RandomizedSearchCV(
-                    estimator=RandomForestRegressor(random_state=42),
-                    param_distributions={
-                        "n_estimators": [100, 200],
-                        "max_samples": [0.6, 0.8, 1],
-                        "max_depth": [3, 4, 5]
-                    },
-                    n_iter=10,
-                    cv=10,
-                    random_state=42
-                )
+                self.model_post = self._default_regressor()
             # actually fit and evaluate model
             self._fit_model()
             self._eval_regressor()
 
         return self.ml_report
+    
+
+    def _default_regressor(self):
+        """Default regression model to be used if not specified by user
+        """
+        return RandomizedSearchCV(
+            estimator=RandomForestRegressor(random_state=42),
+            param_distributions={
+                "n_estimators": [100, 200],
+                "max_samples": [0.6, 0.8, 1],
+                "max_depth": [3, 4, 5]
+            },
+            n_iter=10,
+            cv=10,
+            random_state=42
+        )
+    
+
+    def _default_classifier(self):
+        """Default classification model to be used if not specified by user
+        """
+        return RandomizedSearchCV(
+            estimator=RandomForestClassifier(random_state=42),
+            param_distributions={
+                "n_estimators": [100, 200],
+                "max_samples": [0.6, 0.8, 1],
+                "max_depth": [3, 4, 5]
+            },
+            n_iter=10,
+            cv=10,
+            random_state=42
+        )
 
 
     def _ml_data_prep(self):
